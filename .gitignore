@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.tgz
+# Voidarch Context runtime state (never commit the DB)
+.voidarch/db/
+.voidarch/runtime/
+# legacy runtime/config locations
+.dfc/dev-memory/
+.dfc/*.env
+!.dfc/*.example.env
+.DS_Store

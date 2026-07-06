@@ -2,7 +2,7 @@
   "name": "@voidarch/context",
   "version": "0.1.0",
   "type": "module",
-  "description": "Voidarch Context — drop-in local repo memory, query, and context-pack engine for AI coding agents. Local embeddings, embedded DB, no API key required.",
+  "description": "Voidarch Context \u2014 drop-in local repo memory, query, and context-pack engine for AI coding agents. Local embeddings, embedded DB, no API key required.",
   "license": "MIT",
   "bin": {
     "voidarch-context": "./bin/voidarch-context.js"
@@ -44,5 +44,25 @@
   "devDependencies": {
     "@types/node": "^22.10.0",
     "typescript": "^5.7.0"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/code-shame/voidarch-context.git"
+  },
+  "homepage": "https://github.com/code-shame/voidarch-context#readme",
+  "bugs": {
+    "url": "https://github.com/code-shame/voidarch-context/issues"
+  },
+  "keywords": [
+    "voidarch",
+    "context",
+    "memory",
+    "ai-agents",
+    "claude-code",
+    "codex",
+    "context-pack",
+    "local-first",
+    "embeddings",
+    "surrealdb"
+  ]
 }

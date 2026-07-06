@@ -135,7 +135,7 @@ Serves a local page with repo status, memory browsing, doc search, and context-p
 ## Voidarch Context vs. Voidarch Studio
 
 - **Voidarch Context** (this package): the memory/query/context engine. If it indexes, retrieves, remembers, searches, or explains repo context — it's Context. Standalone, agent-neutral, installable in minutes.
-- **Voidarch Studio**: the orchestration control room built on top — worktrees, terminals, agent launching, provider routing, hooks, observability, GitHub/Vercel integrations. Studio *uses* Context; Context never needs Studio.
+- **[Voidarch Studio](https://github.com/code-shame/voidarch)**: the orchestration control room built on top — worktrees, terminals, agent launching, provider routing, hooks, observability, GitHub/Vercel integrations. Studio *uses* Context; Context never needs Studio.
 
 ## Troubleshooting
 
