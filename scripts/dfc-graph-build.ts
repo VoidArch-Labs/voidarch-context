@@ -1,19 +1,27 @@
-// voidarch-context graph build - build the repo graph DIRECTLY into SurrealDB using the Rust
-// graphify-surreal binary (no python graphify → graph.json → voidarch-context graph import chain).
+// voidarch-context graph build — build the repo graph into SurrealDB.
 //
-//   voidarch-context graph build [--repo-root /path/to/repo] [--deep] [--status|--query "q"]
+// Default engine is the NATIVE pure-TypeScript builder (src/graph-build.ts):
+// file nodes + exported/top-level symbols + import edges, written through the
+// same buildGraphPlan/importGraph pipeline the readers (query/context/status)
+// consume. Works against the zero-config embedded database — no external
+// binary, no credentials.
 //
-// The binary writes graph_node/graph_edge/graph_snapshot rows in the SAME shape the
-// TS readers (voidarch-context context, voidarch-context graph query, dashboard) already consume, into the
-// target repo's own DFC database. Binary resolution: $GRAPHIFY_SURREAL_BIN, then
-// PATH, then the local dev build.
+//   voidarch-context graph build [--repo-root /path] [--dry-run] [--json]
+//
+// The optional Rust engine (external `graphify-surreal` binary; deeper AST /
+// semantic pass, hosted DB) remains available:
+//
+//   voidarch-context graph build --engine graphify-surreal [--deep] [--status|--query "q"]
 
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { normalizeSourceAgent } from "../src/agents.js";
 import { parseArgs, repoRootFromArgs } from "../src/cli.js";
-import { loadConfig } from "../src/surreal.js";
+import { buildNativeGraph } from "../src/graph-build.js";
+import { buildGraphPlan, currentGitCommit, importGraph } from "../src/graph.js";
+import { loadConfig, withDb } from "../src/surreal.js";
 
 const DEV_BUILD = join(homedir(), "Dev", "graphify-surreal", "target", "release", "graphify-surreal");
 
@@ -26,21 +34,49 @@ function resolveBinary(): string | undefined {
   return undefined;
 }
 
-function main(): void {
-  const args = parseArgs(process.argv.slice(2));
-  const repoRoot = repoRootFromArgs(args);
+async function nativeBuild(repoRoot: string, args: Record<string, string>): Promise<void> {
+  const dryRun = args["dry-run"] === "true";
+  const asJson = args.json === "true";
+  const sourceAgent = normalizeSourceAgent(args.agent);
+  const commit = currentGitCommit(repoRoot);
+  const { graph, stats } = buildNativeGraph(repoRoot, commit);
+
+  if (dryRun) {
+    if (asJson) console.log(JSON.stringify({ engine: "native", dryRun: true, ...stats }, null, 2));
+    else console.log(`voidarch-context graph build (native, DRY RUN — no writes)\n  files: ${stats.files}\n  symbols: ${stats.symbols}\n  edges: ${stats.edges}`);
+    return;
+  }
+
+  const imported = await withDb(async (db, cfg) => {
+    const plan = buildGraphPlan(graph, cfg.repoId, sourceAgent, commit, new Date().toISOString());
+    return importGraph(db, plan);
+  }, { repoRoot });
+
+  if (asJson) {
+    console.log(JSON.stringify({ engine: "native", ...stats, ...imported }, null, 2));
+    return;
+  }
+  console.log("voidarch-context graph build (native)");
+  console.log(`  snapshot:   ${imported.snapshotId} (fresh: ${imported.isFresh})`);
+  console.log(`  nodes:      ${imported.nodes} (${stats.symbols} symbols)`);
+  console.log(`  edges:      ${imported.edges}`);
+  console.log(`  next:       voidarch-context query "<question>"`);
+}
+
+function rustBuild(repoRoot: string, args: Record<string, string>): void {
   const bin = resolveBinary();
   if (!bin) {
     console.error(
       "graphify-surreal binary not found. Set GRAPHIFY_SURREAL_BIN, put it on PATH, or build it:\n" +
-        "  cargo build --release -p graphify-surreal   (in the graphify-surreal workspace)",
+        "  cargo build --release -p graphify-surreal   (in the graphify-surreal workspace)\n" +
+        "Or drop --engine and use the built-in native builder.",
     );
     process.exit(2);
   }
 
   const cfg = loadConfig({ repoRoot });
   if (!cfg.url || !cfg.username || !cfg.password || /<[^>]+>/.test(cfg.url + cfg.username + cfg.password)) {
-    console.error("No usable SurrealDB credentials for this repo (.dfc/surreal.env). Run voidarch-context init / db:check first.");
+    console.error("The graphify-surreal engine needs hosted SurrealDB credentials (DFC_SURREAL_*). Use the default native engine for the embedded database.");
     process.exit(2);
   }
 
@@ -61,15 +97,9 @@ function main(): void {
     return res.status ?? 1;
   };
 
-  if (args.status === "true") {
-    process.exit(run(["status"]));
-  }
-  if (args.query) {
-    process.exit(run(["query", args.query]));
-  }
+  if (args.status === "true") process.exit(run(["status"]));
+  if (args.query) process.exit(run(["query", args.query]));
 
-  // Default flow: ensure tables/indexes exist, then AST-build straight into SurrealDB.
-  // --deep opts into the agent-harness semantic pass (external executors; slower).
   const initCode = run(["init-db"]);
   if (initCode !== 0) process.exit(initCode);
   const buildArgs = ["build", repoRoot];
@@ -80,4 +110,25 @@ function main(): void {
   process.exit(code);
 }
 
-main();
+async function main(): Promise<void> {
+  const args = parseArgs(process.argv.slice(2));
+  const repoRoot = repoRootFromArgs(args);
+  const engine = args.engine || "native";
+  if (engine === "graphify-surreal" || engine === "rust" || args.deep === "true") {
+    rustBuild(repoRoot, args);
+    return;
+  }
+  if (engine !== "native") {
+    console.error(`Unknown --engine "${engine}" (native | graphify-surreal)`);
+    process.exit(2);
+  }
+  await nativeBuild(repoRoot, args);
+}
+
+main().then(
+  () => process.exit(0),
+  (err) => {
+    console.error(err instanceof Error ? err.message : err);
+    process.exit(1);
+  },
+);

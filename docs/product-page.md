@@ -27,7 +27,7 @@
 Default-deny text ingestion (secrets and lockfiles never stored), incremental by content hash, `.voidarchignore` excludes.
 
 ### Code graph
-Import or build a symbol/dependency graph; `query "..."` ranks nodes by BM25 + degree and shows the neighborhood edges — "what touches this?" in one command.
+Built-in native graph builder (`graph build`): file nodes, exported symbols, and import edges straight from your sources — no external tools. Or import a deeper externally-built graph; `query "..."` ranks nodes by BM25 + degree and shows the neighborhood edges — "what touches this?" in one command.
 
 ### Docs search
 `search "..."` ranks Markdown/doc chunks (BM25 full-text, or a keyless local dry-run mode with no DB at all).
@@ -68,8 +68,8 @@ Your code never leaves your machine. The database is an embedded file store insi
 
 | | Voidarch Context | Voidarch Studio |
 |---|---|---|
-| What | Memory / query / context engine | Agent orchestration control room |
-| Form | npm package + CLI + local page | Desktop app + dashboard |
+| What | Memory / query / context engine | Agent orchestration control room *(coming soon)* |
+| Form | npm package + CLI + local page | Desktop app + dashboard *(coming soon)* |
 | Owns | Indexing, graph, vectors, memory, context packs | Worktrees, terminals, agent launching, provider routing, hooks, observability, GitHub/Vercel |
 | Needs the other? | No — fully standalone | Yes — Studio builds on Context |
 
@@ -89,8 +89,8 @@ Your code never leaves your machine. The database is an embedded file store insi
 
 ## Roadmap
 
-- Tree-sitter-native graph building in the npm path (no external producer).
+- Tree-sitter upgrade for the native graph builder (today: regex-level extraction for TS/JS/Python).
 - Richer semantic retrieval defaults (auto-embed on ingest, hybrid ranking).
 - First-class Claude Code plugin package.
 - Memory sync/export between machines.
-- Deeper Voidarch Studio integration (context packs attached to agent runs).
+- Voidarch Studio (coming soon): orchestration control room with context packs attached to agent runs.

@@ -31,6 +31,7 @@ voidarch-context context "fix the auth token refresh bug"
 That's it — the third command prints a Markdown context pack (relevant files, symbols, doc excerpts, memories, open tasks/blockers) ready to paste into any agent. Optional next steps:
 
 ```bash
+voidarch-context graph build               # built-in code graph (files, symbols, import edges)
 voidarch-context models install            # pre-download the local embedding model (~90 MB, one-time)
 voidarch-context embed --approve           # embed indexed content for semantic retrieval
 voidarch-context serve                     # local info/search page at http://localhost:4950
@@ -43,7 +44,7 @@ voidarch-context serve                     # local info/search page at http://lo
 | `voidarch-context init` | Scaffold `.voidarch/config.json` + `.gitignore` entries |
 | `voidarch-context ingest` | Index repo text files into the embedded DB |
 | `voidarch-context search "..."` | Rank document chunks for a query (BM25 full-text) |
-| `voidarch-context query "..."` | Rank code-graph nodes + neighborhood edges |
+| `voidarch-context query "..."` | Rank code-graph nodes + neighborhood edges (`graph build` first) |
 | `voidarch-context context "..."` | Build a token-budgeted Markdown/JSON context pack |
 | `voidarch-context remember --kind decision "..."` | Record a durable memory (`decision`, `evidence`, `lesson`, `snippet`, `repo_fact`, `task_note`) |
 | `voidarch-context memory list` / `memory search "..."` | Browse / search stored memories |
@@ -135,7 +136,7 @@ Serves a local page with repo status, memory browsing, doc search, and context-p
 ## Voidarch Context vs. Voidarch Studio
 
 - **Voidarch Context** (this package): the memory/query/context engine. If it indexes, retrieves, remembers, searches, or explains repo context — it's Context. Standalone, agent-neutral, installable in minutes.
-- **[Voidarch Studio](https://github.com/code-shame/voidarch)**: the orchestration control room built on top — worktrees, terminals, agent launching, provider routing, hooks, observability, GitHub/Vercel integrations. Studio *uses* Context; Context never needs Studio.
+- **[Voidarch Studio](https://github.com/code-shame/voidarch)** *(coming soon)*: the orchestration control room built on top — worktrees, terminals, agent launching, provider routing, hooks, observability, GitHub/Vercel integrations. Studio *uses* Context; Context never needs Studio. Studio is in active development — not yet released.
 
 ## Troubleshooting
 
@@ -147,7 +148,7 @@ Serves a local page with repo status, memory browsing, doc search, and context-p
 
 ## MVP limitations
 
-- Graph building (`graph build`) shells out to an optional external producer; without it, `query` falls back to imported graph data or returns empty — `search`, `context`, and memory work regardless.
+- The built-in `graph build` engine is regex-level (file nodes, exported/top-level symbols, import edges for TS/JS/Python; file nodes only for other languages) — deeper AST/semantic graphs need the optional external `graphify-surreal` engine (`--engine graphify-surreal`).
 - `.voidarchignore` supports simple globs only (no negation).
 - Single-process embedded DB: don't run `serve` and a big `ingest` simultaneously.
 - Semantic (vector) retrieval requires an explicit `embed` pass; fresh repos start with BM25 + heuristics.

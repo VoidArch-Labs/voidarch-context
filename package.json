@@ -23,6 +23,7 @@
     "./context-pack": "./src/context-pack.js",
     "./docs": "./src/docs.js",
     "./graph": "./src/graph.js",
+    "./graph-build": "./src/graph-build.js",
     "./ingest": "./src/ingest.js",
     "./metrics": "./src/metrics.js",
     "./voidarch-config": "./src/voidarch-config.js",
