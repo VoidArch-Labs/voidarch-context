@@ -1,22 +1,22 @@
-// Native (pure-TypeScript) repo graph builder — Voidarch Context's own
-// `graph build` engine. No Rust binary, no Tree-sitter: regex-level extraction
-// of file nodes, exported/top-level symbols, and import edges, emitted in the
-// same GraphifyGraph shape the import pipeline (buildGraphPlan/importGraph)
-// and readers (query/context/status) already consume.
-//
-// ponytail: regex extraction, not a parser — good enough for module-level
-// structure; upgrade path is a Tree-sitter pass emitting the same shape.
+// Native repo graph builder — Voidarch Context's own `graph build` engine.
+// Extraction runs on Tree-sitter (WASM grammars via web-tree-sitter — no
+// native compilation) with regex extractors as automatic fallback when a
+// grammar is unavailable or fails to load. File nodes, exported/top-level
+// symbols, and import edges are emitted in the same GraphifyGraph shape the
+// import pipeline (buildGraphPlan/importGraph) and readers (query/context/
+// status) already consume.
 
-import { readFileSync, existsSync, statSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { dirname, extname, join, relative, resolve } from "node:path";
 import { listRepoFiles } from "./ingest.js";
+import { extractWithTreeSitter, treeSitterActive } from "./ts-parser.js";
 import type { GraphifyGraph } from "./graph.js";
 
 const CODE_EXT = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".py", ".go", ".rs", ".rb", ".java", ".kt", ".c", ".h", ".cpp", ".hpp"]);
 const DOC_EXT = new Set([".md", ".mdx", ".txt"]);
 const MAX_BYTES = 256 * 1024; // match ingest's cap; bigger files are noise here
 
-interface Extracted {
+export interface Extracted {
   symbols: Array<{ name: string; kind: "function" | "class" | "const"; line: number }>;
   imports: string[]; // raw import specifiers
 }
@@ -61,7 +61,10 @@ function extractPy(content: string): Extracted {
 /** Other code languages: no symbols/imports (file nodes only). */
 const EMPTY: Extracted = { symbols: [], imports: [] };
 
-function extract(ext: string, content: string): Extracted {
+/** Tree-sitter first; regex fallback when the grammar/runtime is unavailable. */
+async function extract(ext: string, content: string): Promise<Extracted> {
+  const parsed = await extractWithTreeSitter(ext, content);
+  if (parsed) return parsed;
   if ([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"].includes(ext)) return extractJs(content);
   if (ext === ".py") return extractPy(content);
   return EMPTY;
@@ -96,11 +99,12 @@ export interface NativeBuildStats {
   files: number;
   symbols: number;
   edges: number;
+  parser: "tree-sitter" | "regex";
 }
 
 /** Build a GraphifyGraph from the repo's own sources. `builtAtCommit` stamps
  *  freshness (pass currentGitCommit(root)). */
-export function buildNativeGraph(root: string, builtAtCommit: string): { graph: GraphifyGraph; stats: NativeBuildStats } {
+export async function buildNativeGraph(root: string, builtAtCommit: string): Promise<{ graph: GraphifyGraph; stats: NativeBuildStats }> {
   const files = listRepoFiles(root)
     .filter((f) => {
       const ext = extname(f).toLowerCase();
@@ -138,7 +142,7 @@ export function buildNativeGraph(root: string, builtAtCommit: string): { graph: 
     } catch {
       continue;
     }
-    const { symbols, imports } = extract(ext, content);
+    const { symbols, imports } = await extract(ext, content);
 
     for (const s of symbols) {
       symbolCount++;
@@ -167,6 +171,11 @@ export function buildNativeGraph(root: string, builtAtCommit: string): { graph: 
 
   return {
     graph: { nodes, links, hyperedges: [], built_at_commit: builtAtCommit },
-    stats: { files: files.length, symbols: symbolCount, edges: links.length },
+    stats: {
+      files: files.length,
+      symbols: symbolCount,
+      edges: links.length,
+      parser: treeSitterActive() ? "tree-sitter" : "regex",
+    },
   };
 }

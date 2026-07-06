@@ -31,7 +31,7 @@ voidarch-context context "fix the auth token refresh bug"
 That's it — the third command prints a Markdown context pack (relevant files, symbols, doc excerpts, memories, open tasks/blockers) ready to paste into any agent. Optional next steps:
 
 ```bash
-voidarch-context graph build               # built-in code graph (files, symbols, import edges)
+voidarch-context graph build               # built-in Tree-sitter code graph (files, symbols, imports)
 voidarch-context models install            # pre-download the local embedding model (~90 MB, one-time)
 voidarch-context embed --approve           # embed indexed content for semantic retrieval
 voidarch-context serve                     # local info/search page at http://localhost:4950
@@ -148,7 +148,7 @@ Serves a local page with repo status, memory browsing, doc search, and context-p
 
 ## MVP limitations
 
-- The built-in `graph build` engine is regex-level (file nodes, exported/top-level symbols, import edges for TS/JS/Python; file nodes only for other languages) — deeper AST/semantic graphs need the optional external `graphify-surreal` engine (`--engine graphify-surreal`).
+- The built-in `graph build` engine parses TS/TSX/JS/Python with Tree-sitter (WASM grammars, regex fallback) and extracts file nodes, exported/top-level symbols, and import edges; other languages get file nodes only. Deeper semantic graphs need the optional external `graphify-surreal` engine (`--engine graphify-surreal`).
 - `.voidarchignore` supports simple globs only (no negation).
 - Single-process embedded DB: don't run `serve` and a big `ingest` simultaneously.
 - Semantic (vector) retrieval requires an explicit `embed` pass; fresh repos start with BM25 + heuristics.

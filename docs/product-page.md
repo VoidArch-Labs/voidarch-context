@@ -27,7 +27,7 @@
 Default-deny text ingestion (secrets and lockfiles never stored), incremental by content hash, `.voidarchignore` excludes.
 
 ### Code graph
-Built-in native graph builder (`graph build`): file nodes, exported symbols, and import edges straight from your sources — no external tools. Or import a deeper externally-built graph; `query "..."` ranks nodes by BM25 + degree and shows the neighborhood edges — "what touches this?" in one command.
+Built-in native graph builder (`graph build`): Tree-sitter parsing (WASM grammars — no native compilation) extracts file nodes, exported symbols, and import edges straight from your sources, with regex fallback; no external tools. Or import a deeper externally-built graph; `query "..."` ranks nodes by BM25 + degree and shows the neighborhood edges — "what touches this?" in one command.
 
 ### Docs search
 `search "..."` ranks Markdown/doc chunks (BM25 full-text, or a keyless local dry-run mode with no DB at all).
@@ -89,7 +89,7 @@ Your code never leaves your machine. The database is an embedded file store insi
 
 ## Roadmap
 
-- Tree-sitter upgrade for the native graph builder (today: regex-level extraction for TS/JS/Python).
+- More Tree-sitter grammars in the native graph builder (today: TS/TSX/JS/Python; other languages get file nodes) plus call-graph edges.
 - Richer semantic retrieval defaults (auto-embed on ingest, hybrid ranking).
 - First-class Claude Code plugin package.
 - Memory sync/export between machines.

@@ -40,7 +40,9 @@
     "@huggingface/transformers": "^4.2.0",
     "@surrealdb/node": "^3.0.3",
     "surrealdb": "^2.0.4",
-    "tsx": "^4.22.4"
+    "tree-sitter-wasms": "^0.1.13",
+    "tsx": "^4.22.4",
+    "web-tree-sitter": "^0.24.7"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
@@ -64,6 +66,7 @@
     "context-pack",
     "local-first",
     "embeddings",
-    "surrealdb"
+    "surrealdb",
+    "tree-sitter"
   ]
 }

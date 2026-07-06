@@ -1,8 +1,9 @@
 // voidarch-context graph build — build the repo graph into SurrealDB.
 //
-// Default engine is the NATIVE pure-TypeScript builder (src/graph-build.ts):
-// file nodes + exported/top-level symbols + import edges, written through the
-// same buildGraphPlan/importGraph pipeline the readers (query/context/status)
+// Default engine is the NATIVE builder (src/graph-build.ts): Tree-sitter
+// (WASM grammars, no native compilation) with regex fallback — file nodes +
+// exported/top-level symbols + import edges, written through the same
+// buildGraphPlan/importGraph pipeline the readers (query/context/status)
 // consume. Works against the zero-config embedded database — no external
 // binary, no credentials.
 //
@@ -39,11 +40,11 @@ async function nativeBuild(repoRoot: string, args: Record<string, string>): Prom
   const asJson = args.json === "true";
   const sourceAgent = normalizeSourceAgent(args.agent);
   const commit = currentGitCommit(repoRoot);
-  const { graph, stats } = buildNativeGraph(repoRoot, commit);
+  const { graph, stats } = await buildNativeGraph(repoRoot, commit);
 
   if (dryRun) {
     if (asJson) console.log(JSON.stringify({ engine: "native", dryRun: true, ...stats }, null, 2));
-    else console.log(`voidarch-context graph build (native, DRY RUN — no writes)\n  files: ${stats.files}\n  symbols: ${stats.symbols}\n  edges: ${stats.edges}`);
+    else console.log(`voidarch-context graph build (native/${stats.parser}, DRY RUN — no writes)\n  files: ${stats.files}\n  symbols: ${stats.symbols}\n  edges: ${stats.edges}`);
     return;
   }
 
@@ -56,7 +57,7 @@ async function nativeBuild(repoRoot: string, args: Record<string, string>): Prom
     console.log(JSON.stringify({ engine: "native", ...stats, ...imported }, null, 2));
     return;
   }
-  console.log("voidarch-context graph build (native)");
+  console.log(`voidarch-context graph build (native/${stats.parser})`);
   console.log(`  snapshot:   ${imported.snapshotId} (fresh: ${imported.isFresh})`);
   console.log(`  nodes:      ${imported.nodes} (${stats.symbols} symbols)`);
   console.log(`  edges:      ${imported.edges}`);
