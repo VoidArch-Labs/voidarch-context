@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Voidarch Context</title>
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body>
+    <header>
+      <div>
+        <p class="eyebrow">Local repo memory</p>
+        <h1>Voidarch Context</h1>
+      </div>
+      <button id="refresh">Refresh</button>
+    </header>
+
+    <main>
+      <section class="band status-band">
+        <div>
+          <h2>Setup</h2>
+          <ol id="setup"></ol>
+        </div>
+        <div>
+          <h2>Embedding Status</h2>
+          <dl id="embeddings"></dl>
+        </div>
+        <div>
+          <h2>Graph Freshness</h2>
+          <dl id="graph"></dl>
+        </div>
+      </section>
+
+      <section class="band">
+        <h2>Indexed Counts</h2>
+        <div id="counts" class="count-grid"></div>
+      </section>
+
+      <section class="split">
+        <div>
+          <h2>Search</h2>
+          <form id="search-form">
+            <input id="search-input" name="q" placeholder="Search repo memory" autocomplete="off" />
+            <button type="submit">Search</button>
+          </form>
+          <div id="search-results" class="results"></div>
+        </div>
+
+        <div>
+          <h2>Context-Pack Preview</h2>
+          <form id="context-form">
+            <input id="context-input" name="task" placeholder="Task for this agent" autocomplete="off" />
+            <button type="submit">Preview</button>
+          </form>
+          <div id="context-results" class="results"></div>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

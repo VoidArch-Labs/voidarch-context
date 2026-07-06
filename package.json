@@ -1,0 +1,48 @@
+{
+  "name": "@voidarch/context",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Voidarch Context — drop-in local repo memory, query, and context-pack engine for AI coding agents. Local embeddings, embedded DB, no API key required.",
+  "license": "MIT",
+  "bin": {
+    "voidarch-context": "./bin/voidarch-context.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "scripts",
+    "schema",
+    "page",
+    "docs",
+    "README.md"
+  ],
+  "exports": {
+    "./agents": "./src/agents.js",
+    "./batch": "./src/batch.js",
+    "./cli": "./src/cli.js",
+    "./context-pack": "./src/context-pack.js",
+    "./docs": "./src/docs.js",
+    "./graph": "./src/graph.js",
+    "./ingest": "./src/ingest.js",
+    "./metrics": "./src/metrics.js",
+    "./voidarch-config": "./src/voidarch-config.js",
+    "./runs": "./src/runs.js",
+    "./scoring": "./src/scoring.js",
+    "./surreal": "./src/surreal.js",
+    "./types": "./src/types.js",
+    "./vectors": "./src/vectors.js"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
+    "@surrealdb/node": "^3.0.3",
+    "surrealdb": "^2.0.4",
+    "tsx": "^4.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}
