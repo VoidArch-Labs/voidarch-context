@@ -4,7 +4,7 @@
 
 Voidarch Context gives Claude Code, Codex and other coding agents persistent per-repository context without requiring a hosted service. It indexes source and documentation, stores durable memories and task state, builds a lightweight code graph, and assembles ranked context packs under an explicit token budget.
 
-> **Status:** active development, version `0.1.0`. The implemented CLI surface is verified in CI from a packed consumer install. The project is not yet published as a stable npm release.
+> **Status:** active development, version `0.1.0`. CI is configured to verify the implemented CLI surface from a packed consumer install. The project is not yet published as a stable npm release.
 
 ## What is implemented
 
@@ -19,7 +19,7 @@ Voidarch Context gives Claude Code, Codex and other coding agents persistent per
 
 ## Verification
 
-GitHub Actions runs on Node 20 and 22 and verifies:
+The GitHub Actions workflow is configured to run on Node 20 and 22 and verify:
 
 1. TypeScript compilation.
 2. `npm pack` package contents and binary resolution.
