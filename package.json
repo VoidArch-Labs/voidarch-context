@@ -2,7 +2,7 @@
   "name": "@voidarch/context",
   "version": "0.1.0",
   "type": "module",
-  "description": "Voidarch Context \u2014 drop-in local repo memory, query, and context-pack engine for AI coding agents. Local embeddings, embedded DB, no API key required.",
+  "description": "Voidarch Context — drop-in local repo memory, query, and context-pack engine for AI coding agents. Local embeddings, embedded DB, no API key required.",
   "license": "MIT",
   "bin": {
     "voidarch-context": "./bin/voidarch-context.js"
@@ -34,7 +34,8 @@
     "./vectors": "./src/vectors.js"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "smoke": "bash scripts/ci-smoke.sh"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",
@@ -50,11 +51,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/code-shame/voidarch-context.git"
+    "url": "git+https://github.com/VoidArch-Labs/voidarch-context.git"
   },
-  "homepage": "https://github.com/code-shame/voidarch-context#readme",
+  "homepage": "https://github.com/VoidArch-Labs/voidarch-context#readme",
   "bugs": {
-    "url": "https://github.com/code-shame/voidarch-context/issues"
+    "url": "https://github.com/VoidArch-Labs/voidarch-context/issues"
   },
   "keywords": [
     "voidarch",
