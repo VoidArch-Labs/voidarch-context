@@ -1,155 +1,131 @@
 # Voidarch Context
 
-**Drop-in local memory, repo-query, and context-pack engine for AI coding agents — no Docker, no Python, no API key.**
+**Local-first repo memory, search, code-graph and context-pack engine for AI coding agents.**
 
-## Why it exists
+Voidarch Context gives Claude Code, Codex and other coding agents persistent per-repository context without requiring a hosted service. It indexes source and documentation, stores durable memories and task state, builds a lightweight code graph, and assembles ranked context packs under an explicit token budget.
 
-AI coding agents burn tokens re-discovering the same repo facts every session and forget every decision the moment the context window closes. Voidarch Context gives any agent (Claude Code, Codex, or your own) a persistent, local, per-repo brain: indexed files, a code graph, searchable docs, vector embeddings, and durable memories (decisions, lessons, task notes) — assembled on demand into a single token-budgeted context pack.
+> **Status:** active development, version `0.1.0`. The implemented CLI surface is verified in CI from a packed consumer install. The project is not yet published as a stable npm release.
 
-Everything runs locally: an embedded database inside your repo and a local embedding model. Nothing leaves your machine unless you explicitly configure a remote endpoint.
+## What is implemented
 
-## Install
+- Embedded SurrealKV storage inside the target repository.
+- BM25 document search and deterministic ranking heuristics.
+- Local ONNX embeddings through `all-MiniLM-L6-v2`, with an optional approval-gated OpenAI-compatible endpoint.
+- Tree-sitter code-graph extraction for TypeScript, TSX, JavaScript and Python, with regex fallback and file-level support for additional languages.
+- Durable memories, tasks, blockers, run records and context-pack history.
+- Markdown or JSON context packs with estimated token budgets.
+- A local read-mostly status, search and context page.
+- Claude Code command snippets and an `AGENTS.md` integration block.
+
+## Verification
+
+GitHub Actions runs on Node 20 and 22 and verifies:
+
+1. TypeScript compilation.
+2. `npm pack` package contents and binary resolution.
+3. Installation of the tarball into a fresh temporary Git repository.
+4. `init`, `ingest`, `graph build`, `remember`, `search`, `query`, `context` and `status` through the shipped `voidarch-context` binary.
+5. Machine-readable context output and token-budget metadata.
+
+The smoke test is available locally as:
 
 ```bash
-npm install -g @voidarch/context      # global CLI
-# or per-repo:
-npm install --save-dev @voidarch/context
-npx voidarch-context help
+npm ci
+npm run typecheck
+npm run smoke
 ```
 
-Requires Node 20+. No Docker, no Python, no Rust toolchain.
-
-## 3-minute quickstart
+## Install from source
 
 ```bash
-cd your-repo
-voidarch-context init                      # writes .voidarch/config.json + .gitignore entries
-voidarch-context ingest                    # index the repo (files, docs)
-voidarch-context context "fix the auth token refresh bug"
+git clone https://github.com/VoidArch-Labs/voidarch-context.git
+cd voidarch-context
+npm ci
+npm link
+voidarch-context help
 ```
 
-That's it — the third command prints a Markdown context pack (relevant files, symbols, doc excerpts, memories, open tasks/blockers) ready to paste into any agent. Optional next steps:
+Requires Node 20 or newer. Docker, Python and a Rust toolchain are not required.
+
+## Quick start
 
 ```bash
-voidarch-context graph build               # built-in Tree-sitter code graph (files, symbols, imports)
-voidarch-context models install            # pre-download the local embedding model (~90 MB, one-time)
-voidarch-context embed --approve           # embed indexed content for semantic retrieval
-voidarch-context serve                     # local info/search page at http://localhost:4950
+cd your-repository
+voidarch-context init
+voidarch-context ingest
+voidarch-context graph build
+voidarch-context context "fix the authentication token refresh bug"
 ```
 
-## CLI commands
+Optional semantic retrieval:
 
-| Command | What it does |
+```bash
+voidarch-context models install
+voidarch-context embed --approve
+```
+
+The model download happens once and is cached locally. Remote embedding endpoints are opt-in and require explicit approval before paid calls.
+
+## Main commands
+
+| Command | Purpose |
 |---|---|
-| `voidarch-context init` | Scaffold `.voidarch/config.json` + `.gitignore` entries |
-| `voidarch-context ingest` | Index repo text files into the embedded DB |
-| `voidarch-context search "..."` | Rank document chunks for a query (BM25 full-text) |
-| `voidarch-context query "..."` | Rank code-graph nodes + neighborhood edges (`graph build` first) |
-| `voidarch-context context "..."` | Build a token-budgeted Markdown/JSON context pack |
-| `voidarch-context remember --kind decision "..."` | Record a durable memory (`decision`, `evidence`, `lesson`, `snippet`, `repo_fact`, `task_note`) |
-| `voidarch-context memory list` / `memory search "..."` | Browse / search stored memories |
-| `voidarch-context status` | Counts + freshness across all channels |
-| `voidarch-context serve` | Local self-hosted info/search/context page |
-| `voidarch-context doctor` | Health report across DB, ingest, docs, graph, vectors, memory |
+| `voidarch-context init` | Create `.voidarch/config.json` and safe `.gitignore` entries |
+| `voidarch-context ingest` | Index repository source and documentation |
+| `voidarch-context search "..."` | Rank indexed document chunks |
+| `voidarch-context graph build` | Build file, symbol and import relationships |
+| `voidarch-context query "..."` | Search code-graph nodes and neighborhoods |
+| `voidarch-context context "..."` | Produce a token-budgeted Markdown or JSON context pack |
+| `voidarch-context remember --kind decision "..."` | Store a durable project memory |
+| `voidarch-context memory list` | Inspect stored memories |
+| `voidarch-context task ...` | Manage persistent task state |
+| `voidarch-context blocker ...` | Manage blockers |
+| `voidarch-context status` | Report freshness and record counts |
+| `voidarch-context doctor` | Inspect database, graph, vectors and memory health |
+| `voidarch-context serve` | Start the local read-mostly web page |
 
-More: `task`, `blocker`, `metrics`, `sync`, `embed`, `docs <ingest|query>`, `graph <build|import|query|status>`, `db <status|migrate>`, `models <status|install>`, `config embedding <local|openai-compatible>`, `snippets`. Run `voidarch-context help` for the full surface.
+Run `voidarch-context help` for the complete command surface.
 
-## Embeddings
-
-### Local (default, keyless)
-
-The default embedding provider is a local ONNX model (`all-MiniLM-L6-v2`) run via `@huggingface/transformers`. It downloads and caches automatically on first use, or explicitly:
-
-```bash
-voidarch-context models status     # provider/model/cache state
-voidarch-context models install    # pre-download + warm the cache
-```
-
-No API key, no network calls after the one-time model download.
-
-### OpenAI-compatible endpoint (optional)
-
-Point at any OpenAI-compatible embeddings API (OpenAI, local inference servers, gateways):
-
-```bash
-voidarch-context config embedding openai-compatible
-export VOIDARCH_EMBED_BASE_URL="https://api.openai.com"   # or your endpoint
-export VOIDARCH_EMBED_MODEL="text-embedding-3-small"
-export VOIDARCH_EMBED_API_KEY="sk-..."                     # or OPENAI_API_KEY
-export VOIDARCH_EMBED_DIMENSIONS="1536"                    # optional
-voidarch-context embed --approve                            # paid calls always need explicit approval
-```
-
-Paid embedding calls are gated: they run only with `--approve` or `VOIDARCH_EMBED_APPROVED=1`, so you can never bill an API key by accident. Switch back anytime with `voidarch-context config embedding local`.
-
-## What files it creates
+## Storage and privacy
 
 | Path | Purpose | Commit? |
 |---|---|---|
-| `.voidarch/config.json` | repoId + embedding provider choice (no secrets) | yes (optional) |
-| `.voidarch/db/` | embedded SurrealKV database (all indexed data + memories) | no (gitignored by `init`) |
-| `.voidarchignore` | optional gitignore-style excludes for ingest | yes |
-| `.gitignore` additions | keeps the DB and legacy env files out of git | yes |
+| `.voidarch/config.json` | Repository identity and embedding-provider choice | Optional |
+| `.voidarch/db/` | Embedded database and durable memory | No |
+| `.voidarch/runtime/` | Runtime state | No |
+| `.voidarchignore` | Optional ingest exclusions | Optional |
 
-Legacy repos initialized before the Voidarch rename (`.nox/config.json`, `.dfc/dev-memory/`, `.noxignore`, `NOX_EMBED_*` env vars) keep working — old paths are read as deprecated fallbacks; new writes go to `.voidarch/`.
+- The embedded database stays in the repository directory.
+- Local embeddings are the default.
+- Remote endpoints are opt-in.
+- Ingest skips dotenv files, lockfiles and secrets-shaped filenames.
+- The web page binds to localhost.
+- No telemetry is sent by the Context package.
 
-## Privacy / local-first
+## Architecture
 
-- Embedded database lives inside your repo; no server, no cloud, no telemetry.
-- Local embeddings by default; remote embedding endpoints are opt-in and approval-gated.
-- Ingest is default-deny by extension and skips dotenv files, lockfiles, and secrets-shaped names.
-- The info page (`serve`) binds locally and reads only your repo's own database.
-
-## Using with Claude Code
-
-Run `voidarch-context snippets` and paste the printed slash command into `.claude/commands/voidarch-context.md`:
-
-```markdown
----
-description: Build a Voidarch Context pack for the current task
----
-
-Run `npx voidarch-context context "$ARGUMENTS"` and use the Markdown output as
-context for the rest of this task. If it reports open blockers or required
-approvals, surface those to the user before proceeding.
+```text
+Repository files and docs
+        │
+        ├── ingest ──> embedded SurrealKV documents
+        ├── graph build ──> files, symbols and import edges
+        ├── remember/task/blocker ──> durable project state
+        └── embed ──> optional local or approved remote vectors
+                              │
+Task query ──> ranking and neighborhood retrieval ──> token-budgeted context pack
 ```
 
-Then `/voidarch-context <task>` inside Claude Code builds and injects a context pack. Have the agent record durable facts with `voidarch-context remember --kind decision "..."` as it works.
+The standalone repository is synchronized from the `packages/voidarch-context` workspace inside [Voidarch Studio](https://github.com/VoidArch-Labs/voidarch). Context remains independently usable and does not require Studio.
 
-## Using with Codex / AGENTS.md
+## Current limitations
 
-`voidarch-context snippets` also prints an AGENTS.md block. Add it to your repo's `AGENTS.md` so Codex (and any AGENTS.md-aware agent) knows to run:
+- Embedded SurrealKV is single-process. Do not run a large ingest while `serve` holds the database lock.
+- Tree-sitter symbol extraction is deepest for TypeScript, TSX, JavaScript and Python. Other languages currently receive file nodes unless an external graph engine is used.
+- `.voidarchignore` supports simple globs without negation.
+- Vector retrieval requires an explicit `embed` pass. Fresh repositories start with BM25 and deterministic heuristics.
+- The local web page is read-mostly; management workflows live in the CLI.
+- Stable npm publication and release automation are not yet complete.
 
-```bash
-npx voidarch-context context "<short task description>"   # before non-trivial tasks
-npx voidarch-context remember --kind lesson "..."          # to record what it learned
-```
+## License
 
-## Local info page
-
-```bash
-voidarch-context serve --port 4950
-```
-
-Serves a local page with repo status, memory browsing, doc search, and context-pack building — a read-mostly window into the same embedded DB the CLI uses.
-
-## Voidarch Context vs. Voidarch Studio
-
-- **Voidarch Context** (this package): the memory/query/context engine. If it indexes, retrieves, remembers, searches, or explains repo context — it's Context. Standalone, agent-neutral, installable in minutes.
-- **[Voidarch Studio](https://github.com/code-shame/voidarch)** *(coming soon)*: the orchestration control room built on top — worktrees, terminals, agent launching, provider routing, hooks, observability, GitHub/Vercel integrations. Studio *uses* Context; Context never needs Studio. Studio is in active development — not yet released.
-
-## Troubleshooting
-
-- **`Embedded SurrealDB connect timed out`** — SurrealKV allows one process at a time; another command (or `serve`) holds the lock. Wait or kill it. A killed process can hold the lock briefly.
-- **`tsx: command not found`** — install dependencies (`npm install`); the CLI runs its TypeScript scripts via the bundled `tsx`.
-- **Empty search/context results** — run `voidarch-context ingest` first; check `voidarch-context status` for per-channel counts and `voidarch-context doctor` for a full health report.
-- **Local model download slow/blocked** — `voidarch-context models install` shows progress; the cache persists, it's one-time per machine.
-- **Old `.dfc`/`.nox` repo** — nothing to migrate; legacy paths are auto-detected. New repos get `.voidarch/`.
-
-## MVP limitations
-
-- The built-in `graph build` engine parses TS/TSX/JS/Python with Tree-sitter (WASM grammars, regex fallback) and extracts file nodes, exported/top-level symbols, and import edges; other languages get file nodes only. Deeper semantic graphs need the optional external `graphify-surreal` engine (`--engine graphify-surreal`).
-- `.voidarchignore` supports simple globs only (no negation).
-- Single-process embedded DB: don't run `serve` and a big `ingest` simultaneously.
-- Semantic (vector) retrieval requires an explicit `embed` pass; fresh repos start with BM25 + heuristics.
-- The info page is read-mostly; management UX lives in the CLI.
+MIT
