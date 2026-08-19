@@ -15,6 +15,14 @@ cd "$WORK/consumer"
 npm init -y >/dev/null
 npm install --silent "$TARBALL_PATH"
 
+cat > import-check.ts <<'TS'
+import { connect } from "@voidarch/context/surreal";
+import { buildContextPack } from "@voidarch/context/context-pack";
+if (typeof connect !== "function" || typeof buildContextPack !== "function") process.exit(1);
+TS
+./node_modules/.bin/tsx import-check.ts
+rm -f import-check.ts
+
 git init -q
 git config user.email "ci@voidarch.local"
 git config user.name "Voidarch CI"
