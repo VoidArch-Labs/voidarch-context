@@ -28,6 +28,9 @@ import {
   scoreToolEvent,
   tokenize,
 } from "./scoring.js";
+import type { ContextEntityEntry, ContextEpisodeEntry, ContextFactEntry } from "./types.js";
+import { queryEpisodes, queryFacts, searchEntities } from "./general.js";
+import type { Sensitivity } from "./write-policy.js";
 import { ftSearchTerms, queryResult } from "./surreal.js";
 import { queryDocChunks } from "./docs.js";
 import { neighborhoodEdges, queryGraphNodes } from "./graph.js";
@@ -181,6 +184,7 @@ function buildQueryPlan(
       { channel: "memory", reason: "Durable decisions, evidence, lessons, and repo facts preserve prior context.", target_items: 10 },
       { channel: "graph", reason: "Graph nodes and neighborhoods expose symbols, dependencies, and freshness.", target_items: 8 },
       { channel: "vectors", reason: "Local embeddings add semantic recall when indexed chunks exist.", target_items: 6 },
+      { channel: "general", reason: "Entities and temporal facts (confirmed unless requested otherwise) carry cross-plane knowledge.", target_items: 12 },
       { channel: "state", reason: "Open tasks and blockers prevent stale or conflicting work.", target_items: 10 },
       { channel: "runs", reason: "Recent runs and tool events explain verification and failure history.", target_items: 8 },
     ],
@@ -405,6 +409,14 @@ export interface BuildContextPackOptions {
   includeMemory?: boolean;
   /** Include repo_context.graph_neighborhood + symbols. Default true. */
   includeGraph?: boolean;
+  /** General plane scope; defaults to the repoId so repo-tied requests keep working. */
+  scopeId?: string;
+  /** Point-in-time fact view (ISO-8601). Default: now. */
+  asOf?: string;
+  /** Sensitivity ceiling for general-plane facts. Default "internal". */
+  maxSensitivity?: Sensitivity;
+  /** Also surface candidate/proposed facts (clearly labelled). Default false. */
+  includeCandidates?: boolean;
 }
 
 export async function buildContextPack(
@@ -558,6 +570,79 @@ export async function buildContextPack(
     vectorChunks = [];
   }
 
+  // --- general plane: entities + temporal facts (graceful pre-0006 degrade) ---
+  let generalEntities: ContextEntityEntry[] = [];
+  let generalFacts: ContextFactEntry[] = [];
+  let generalEpisodes: ContextEpisodeEntry[] = [];
+  try {
+    const scopeId = opts.scopeId || repoId;
+    const statuses = opts.includeCandidates
+      ? (["confirmed", "proposed", "candidate"] as const)
+      : (["confirmed"] as const);
+    const entities = await searchEntities(
+      db,
+      scopeId,
+      terms,
+      8,
+      opts.maxSensitivity ?? "internal",
+    );
+    generalEntities = entities.map((e, i) => ({
+      ref: `entity:${e.id}`,
+      name: e.name,
+      entity_type: e.entity_type,
+      aliases: e.aliases ?? [],
+      score: Math.round((100 - i * 5) * 100) / 100,
+    }));
+    const factRows = await queryFacts(db, scopeId, {
+      terms: terms.length ? terms : undefined,
+      statuses: [...statuses],
+      asOf: opts.asOf ?? new Date(now).toISOString(),
+      maxSensitivity: opts.maxSensitivity,
+      limit: 12,
+    });
+    // Also pull facts about the resolved entities even if their statements
+    // don't share the task's words (deterministic structural retrieval).
+    for (const e of entities.slice(0, 3)) {
+      const linked = await queryFacts(db, scopeId, {
+        subjectRef: `entity:${e.id}`,
+        statuses: [...statuses],
+        asOf: opts.asOf ?? new Date(now).toISOString(),
+        maxSensitivity: opts.maxSensitivity,
+        limit: 6,
+      });
+      for (const f of linked) if (!factRows.some((x) => x.fact_key === f.fact_key)) factRows.push(f);
+    }
+    generalFacts = factRows.map((f, i) => ({
+      subject_ref: f.subject_ref,
+      predicate: f.predicate,
+      object: f.object_ref ?? JSON.stringify(f.object_value ?? null),
+      statement: f.statement,
+      status: f.status,
+      confidence: f.confidence,
+      observed_at: f.observed_at,
+      provenance_method: f.provenance?.method ?? "unknown",
+      score: Math.round((90 - i * 3) * 100) / 100,
+    }));
+    const episodeRows = await queryEpisodes(db, scopeId, {
+      terms: terms.length ? terms : undefined,
+      limit: 8,
+    });
+    generalEpisodes = episodeRows.map((episode, i) => ({
+      ref: `episode:${episode.id}`,
+      source: episode.source,
+      source_ref: episode.source_ref,
+      actor: episode.actor,
+      trust: episode.trust,
+      content: episode.content.slice(0, 1600),
+      occurred_at: episode.occurred_at,
+      score: Math.round((70 - i * 3) * 100) / 100,
+    }));
+  } catch {
+    generalEntities = [];
+    generalFacts = [];
+    generalEpisodes = [];
+  }
+
   // --- recent verification failures ---
   const verificationRows = await queryResult<Array<{ summary: string; failures: unknown }>>(
     db,
@@ -602,6 +687,7 @@ export async function buildContextPack(
     document_context: { chunks: [] },
     vector_context: { chunks: [] },
     memory_context: { decisions: [], evidence: [], lessons: [], repo_facts: [], snippets: [], task_notes: [] },
+    general_context: { entities: [], facts: [], episodes: [] },
     state: { open_blockers: [], open_tasks: [] },
     verification: { last_failures: lastFailures.slice(0, 5) },
     workflow: { approval_required: approvalRequired, approval_available: approvalAvailable },
@@ -696,6 +782,33 @@ export async function buildContextPack(
       continue;
     }
     pack.memory_context.task_notes.push(tn);
+    tokens += cost;
+  }
+  for (const ent of generalEntities) {
+    const cost = estimateTokens(`${ent.name} ${ent.entity_type} ${ent.aliases.join(" ")}`);
+    if (tokens + cost > targetTokens) {
+      dropped.push(`entity:${ent.name.slice(0, 40)}`);
+      continue;
+    }
+    pack.general_context.entities.push(ent);
+    tokens += cost;
+  }
+  for (const gf of generalFacts) {
+    const cost = estimateTokens(gf.statement);
+    if (tokens + cost > targetTokens) {
+      dropped.push(`fact:${gf.statement.slice(0, 40)}`);
+      continue;
+    }
+    pack.general_context.facts.push(gf);
+    tokens += cost;
+  }
+  for (const episode of generalEpisodes) {
+    const cost = estimateTokens(`${episode.source} ${episode.trust} ${episode.content}`);
+    if (tokens + cost > targetTokens) {
+      dropped.push(`episode:${episode.ref.slice(0, 40)}`);
+      continue;
+    }
+    pack.general_context.episodes.push(episode);
     tokens += cost;
   }
   for (const b of openBlockers) {
@@ -827,6 +940,31 @@ export function formatContextPackMarkdown(pack: ContextPack): string {
     out.push(
       mdList(
         pack.vector_context.chunks.slice(0, 6).map((v) => `(vector) ${v.source_id} — ${v.excerpt.slice(0, 140)}`),
+      ),
+    );
+  }
+
+  if (pack.general_context.entities.length || pack.general_context.facts.length) {
+    out.push("\n## Entities & facts");
+    out.push(
+      mdList([
+        ...pack.general_context.entities.slice(0, 8).map((e) => `${e.name} (${e.entity_type})`),
+        ...pack.general_context.facts
+          .slice(0, 10)
+          .map((f) => `${f.statement}${f.status === "confirmed" ? "" : ` [${f.status}, unverified]`}`),
+      ]),
+    );
+  }
+
+  if (pack.general_context.episodes.length) {
+    out.push("\n## Recalled episodes (evidence, not authoritative facts)");
+    out.push(
+      mdList(
+        pack.general_context.episodes
+          .slice(0, 8)
+          .map((episode) =>
+            `[${episode.source}; trust=${episode.trust}; ${episode.occurred_at}] ${episode.content}`,
+          ),
       ),
     );
   }

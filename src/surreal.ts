@@ -262,23 +262,30 @@ export const MIGRATIONS = [
   "schema/0003_documents_graph_vectors.surql",
   "schema/0004_state_memory_kinds.surql",
   "schema/0005_task_note.surql",
+  "schema/0006_general_plane.surql",
 ];
 
-let schemaEnsured = false;
+const schemasEnsured = new Set<string>();
 
 /** Fresh embedded DBs (the keyless default) have no schema until a migrate runs.
  *  Probe once per process and auto-apply migrations so `voidarch-context init && voidarch-context ingest`
  *  works in a repo that has never run `voidarch-context db migrate`. Embedded-only: remote
  *  servers are managed explicitly via the migrate command. */
-async function ensureSchema(db: Surreal): Promise<void> {
-  if (schemaEnsured) return;
+async function ensureSchema(db: Surreal, cfg: DfcConfig): Promise<void> {
+  const key = `${cfg.url}\0${cfg.namespace}\0${cfg.database}`;
+  // Every mem:// client owns a fresh ephemeral store, so it must be migrated on
+  // every connection. Persistent embedded URLs can be cached per database.
+  const cacheable = cfg.url !== "mem://";
+  if (cacheable && schemasEnsured.has(key)) return;
   const info = await queryResult<{ tables?: Record<string, unknown> }>(db, "INFO FOR DB");
-  if (!info?.tables?.file) {
+  // `fact` is the newest table (0006): its absence means either a fresh DB or a
+  // pre-0006 DB — every migration is IF NOT EXISTS, so re-applying all is safe.
+  if (!info?.tables?.file || !info?.tables?.fact) {
     for (const rel of MIGRATIONS) {
       await queryResults(db, readFileSync(join(PKG_ROOT, rel), "utf8"));
     }
   }
-  schemaEnsured = true;
+  if (cacheable) schemasEnsured.add(key);
 }
 
 export async function connect(cfg: DfcConfig): Promise<Surreal> {
@@ -296,7 +303,7 @@ export async function connect(cfg: DfcConfig): Promise<Surreal> {
       await withTimeout("SurrealDB connect", db.connect(cfg.url), timeoutMs);
       if (!embedded) await withTimeout("SurrealDB signin", authenticate(db, cfg), timeoutMs);
       await withTimeout("SurrealDB use", db.use({ namespace: cfg.namespace, database: cfg.database }), timeoutMs);
-      if (embedded) await ensureSchema(db);
+      if (embedded) await ensureSchema(db, cfg);
       return db;
     } catch (err) {
       lastError = err;

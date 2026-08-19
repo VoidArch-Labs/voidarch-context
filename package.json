@@ -2,7 +2,7 @@
   "name": "@voidarch/context",
   "version": "0.1.0",
   "type": "module",
-  "description": "Voidarch Context — drop-in local repo memory, query, and context-pack engine for AI coding agents. Local embeddings, embedded DB, no API key required.",
+  "description": "Voidarch Context \u2014 drop-in local repo memory, query, and context-pack engine for AI coding agents. Local embeddings, embedded DB, no API key required.",
   "license": "MIT",
   "bin": {
     "voidarch-context": "./bin/voidarch-context.js"
@@ -31,11 +31,15 @@
     "./scoring": "./src/scoring.js",
     "./surreal": "./src/surreal.js",
     "./types": "./src/types.js",
-    "./vectors": "./src/vectors.js"
+    "./vectors": "./src/vectors.js",
+    "./delegation": "./src/delegation.js",
+    "./general": "./src/general.js",
+    "./write-policy": "./src/write-policy.js"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "smoke": "bash scripts/ci-smoke.sh"
+    "smoke": "bash scripts/ci-smoke.sh",
+    "test:general": "tsx --test --test-force-exit tests/general-plane.test.ts tests/context-compiler.test.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",

@@ -28,5 +28,7 @@ jobs:
         run: npm ci
       - name: Typecheck
         run: npm run typecheck
+      - name: General context plane tests
+        run: npm run test:general
       - name: Packed CLI end-to-end smoke test
         run: npm run smoke

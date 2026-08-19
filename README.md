@@ -13,6 +13,7 @@ Voidarch Context gives Claude Code, Codex and other coding agents persistent per
 - Local ONNX embeddings through `all-MiniLM-L6-v2`, with an optional approval-gated OpenAI-compatible endpoint.
 - Tree-sitter code-graph extraction for TypeScript, TSX, JavaScript and Python, with regex fallback and file-level support for additional languages.
 - Durable memories, tasks, blockers, run records and context-pack history.
+- Scoped entities, immutable source episodes and temporal facts with provenance and review states.
 - Markdown or JSON context packs with estimated token budgets.
 - A local read-mostly status, search and context page.
 - Claude Code command snippets and an `AGENTS.md` integration block.
@@ -76,6 +77,7 @@ The model download happens once and is cached locally. Remote embedding endpoint
 | `voidarch-context graph build` | Build file, symbol and import relationships |
 | `voidarch-context query "..."` | Search code-graph nodes and neighborhoods |
 | `voidarch-context context "..."` | Produce a token-budgeted Markdown or JSON context pack |
+| `voidarch-context knowledge ...` | Store/query entities, episodes and temporal facts |
 | `voidarch-context remember --kind decision "..."` | Store a durable project memory |
 | `voidarch-context memory list` | Inspect stored memories |
 | `voidarch-context task ...` | Manage persistent task state |
