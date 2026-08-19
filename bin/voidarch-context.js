@@ -21,6 +21,7 @@ const tsCommands = new Map([
   ["page", "scripts/dfc-nox.ts"], // deprecated alias of `serve`
   ["remember", "scripts/dfc-remember.ts"],
   ["memory", "scripts/dfc-memory.ts"],
+  ["knowledge", "scripts/dfc-knowledge.ts"],
   ["task", "scripts/dfc-task.ts"],
   ["blocker", "scripts/dfc-blocker.ts"],
   ["metrics", "scripts/dfc-metrics.ts"],
@@ -89,6 +90,7 @@ Memory:
   memory <add|list|search|get|update|delete>
   task <add|list|update|done|get|delete>
   blocker <add|list|resolve|get|delete>
+  knowledge <entity-upsert|entity-search|episode-add|episode-search|fact-assert|fact-list|fact-review>
   memory doctor
   memory gc
 

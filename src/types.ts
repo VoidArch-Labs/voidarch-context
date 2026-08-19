@@ -298,6 +298,40 @@ export interface ContextVectorChunkEntry {
   score: number;
 }
 
+// ---- General-plane entries (Stage 5, migration 0006) -------------------------
+
+export interface ContextEntityEntry {
+  ref: string; // entity:<id>
+  name: string;
+  entity_type: string;
+  aliases: string[];
+  score: number;
+}
+
+export interface ContextFactEntry {
+  subject_ref: string;
+  predicate: string;
+  object: string; // object_ref or rendered object_value
+  statement: string;
+  status: string; // confirmed facts only unless includeCandidates
+  confidence: number;
+  observed_at: string;
+  provenance_method: string;
+  score: number;
+}
+
+/** Immutable evidence recalled from a source episode. Never authoritative. */
+export interface ContextEpisodeEntry {
+  ref: string;
+  source: string;
+  source_ref: string;
+  actor: string;
+  trust: string;
+  content: string;
+  occurred_at: string;
+  score: number;
+}
+
 export interface ContextPack {
   task: { goal: string; phase: Phase };
   query_plan?: {
@@ -320,6 +354,12 @@ export interface ContextPack {
     repo_facts: ContextMemoryEntry[];
     snippets: ContextSnippetEntry[];
     task_notes: ContextMemoryEntry[];
+  };
+  /** General plane (entities + temporal facts); empty pre-0006 or when disabled. */
+  general_context: {
+    entities: ContextEntityEntry[];
+    facts: ContextFactEntry[];
+    episodes: ContextEpisodeEntry[];
   };
   state: {
     open_blockers: ContextBlockerEntry[];
