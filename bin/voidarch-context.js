@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 
-import { existsSync } from "node:fs";
 import { spawn } from "node:child_process";
+import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
+const require = createRequire(import.meta.url);
 
 // Script filenames keep their historical dfc-/nox- prefixes (internal only);
 // the public command surface below is the product API.
@@ -113,9 +114,8 @@ function resolveCommand(argv) {
 }
 
 function run(script, args) {
-  const tsx = join(root, "node_modules", ".bin", process.platform === "win32" ? "tsx.cmd" : "tsx");
-  const command = existsSync(tsx) ? tsx : "tsx";
-  const child = spawn(command, [join(root, script), ...args], {
+  const tsxCli = require.resolve("tsx/cli");
+  const child = spawn(process.execPath, [tsxCli, join(root, script), ...args], {
     cwd: process.cwd(),
     env: process.env,
     stdio: "inherit",

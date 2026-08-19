@@ -1,6 +1,7 @@
 // voidarch-context ingest - scan repo text files and upsert them into SurrealDB.
 
 import { ingestRepo } from "../src/ingest.js";
+import { buildDocPlan, ingestDocs } from "../src/docs.js";
 import { withDb } from "../src/surreal.js";
 import { normalizeSourceAgent } from "../src/agents.js";
 import { parseArgs, positiveIntArg, repoRootFromArgs } from "../src/cli.js";
@@ -16,6 +17,9 @@ async function main(): Promise<void> {
     console.log(
       `ingest complete: scanned ${stats.scanned}, ingested ${stats.ingested}, skipped ${stats.skipped}, unchanged ${stats.unchanged}, limited ${stats.limited}`,
     );
+    const docPlan = buildDocPlan(repoRoot, cfg.repoId, sourceAgent, new Date().toISOString());
+    const docs = await ingestDocs(db, docPlan);
+    console.log(`docs complete: documents ${docs.documents}, chunks ${docs.chunks}, unchanged ${docs.unchanged}, limited ${docs.limited}`);
   }, { repoRoot });
 }
 
