@@ -12,14 +12,43 @@ import { parseArgs, repoRootFromArgs } from "../src/cli.js";
 import { buildContextPack } from "../src/context-pack.js";
 import { queryDocChunks } from "../src/docs.js";
 import { tokenize } from "../src/scoring.js";
-import { ftSearchTerms, loadConfig, queryResult, PKG_ROOT, withDb } from "../src/surreal.js";
+import { assertUsableConfig, connect, ftSearchTerms, loadConfig, queryResult, PKG_ROOT } from "../src/surreal.js";
 import { listEmbeddingModels, resolveEmbedConfig } from "../src/vectors.js";
+import { queryOperationalObservations, queryOperationalSolutions, recordOperationalObservation, type OperationalOutcome } from "../src/operational.js";
 
 process.env.DFC_SURREAL_CONNECT_TIMEOUT_MS ??= "8000";
 process.env.DFC_SURREAL_CONNECT_ATTEMPTS ??= "1";
 process.env.DFC_SURREAL_QUERY_TIMEOUT_MS ??= "15000";
 
 const ASSET_DIR = join(PKG_ROOT, "page");
+let dbPromise: Promise<{ db: Surreal; cfg: ReturnType<typeof loadConfig> }> | undefined;
+let dbQueue: Promise<unknown> = Promise.resolve();
+
+function serverDb(repoRoot: string): Promise<{ db: Surreal; cfg: ReturnType<typeof loadConfig> }> {
+  if (!dbPromise) {
+    const cfg = loadConfig({ repoRoot });
+    assertUsableConfig(cfg);
+    dbPromise = connect(cfg).then((db) => ({ db, cfg })).catch((error) => { dbPromise = undefined; throw error; });
+  }
+  return dbPromise;
+}
+
+function withServerDb<T>(
+  fn: (db: Surreal, cfg: ReturnType<typeof loadConfig>) => Promise<T>,
+  repoRoot: string,
+): Promise<T> {
+  const run = async () => { const { db, cfg } = await serverDb(repoRoot); return fn(db, cfg); };
+  const next = dbQueue.then(run, run);
+  dbQueue = next.catch(() => {});
+  return next;
+}
+
+async function closeServerDb(): Promise<void> {
+  if (!dbPromise) return;
+  try { const { db } = await dbPromise; await db.close(); } catch { /* shutdown best effort */ }
+  dbPromise = undefined;
+}
+
 const COUNT_TABLES = [
   "file",
   "document",
@@ -72,6 +101,26 @@ function mime(path: string): string {
   return "text/html; charset=utf-8";
 }
 
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let bytes = 0;
+    req.on("data", (chunk: Buffer) => {
+      bytes += chunk.length;
+      if (bytes > 256 * 1024) { reject(new Error("request body too large")); req.destroy(); return; }
+      chunks.push(chunk);
+    });
+    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    req.on("error", reject);
+  });
+}
+
+function commaList(value: string | null): string[] | undefined {
+  if (!value) return undefined;
+  const values = value.split(",").map((item) => item.trim()).filter(Boolean);
+  return values.length ? values : undefined;
+}
+
 async function countTable(db: Surreal, table: string, repoId: string): Promise<number> {
   const rows = await queryResult<Array<{ c?: number }>>(
     db,
@@ -88,7 +137,7 @@ async function collectStatus(repoRoot: string): Promise<Record<string, unknown>>
   const branch = git(repoRoot, "branch", "--show-current") || "(detached)";
   const graphJson = join(repoRoot, "graphify-out", "graph.json");
 
-  return await withDb(async (db, c) => {
+  return await withServerDb(async (db, c) => {
     const counts: Record<string, number> = {};
     for (const table of COUNT_TABLES) {
       try {
@@ -162,14 +211,14 @@ async function collectStatus(repoRoot: string): Promise<Record<string, unknown>>
         status: existsSync(graphJson) ? "graphify-out/graph.json exists; import it with voidarch-context graph import for DB freshness" : "not indexed",
       },
     };
-  }, { repoRoot });
+  }, repoRoot);
 }
 
 async function search(repoRoot: string, q: string): Promise<Record<string, unknown>> {
   const terms = Array.from(new Set(tokenize(q))).slice(0, 8);
   if (!terms.length) return { query: q, docs: [], files: [], memories: [] };
 
-  return await withDb(async (db, cfg) => {
+  return await withServerDb(async (db, cfg) => {
     const docs = await queryDocChunks(db, cfg.repoId, q, 8).catch(() => []);
     const files = await ftSearchTerms<{ path?: string; ext?: string; size?: number; content?: string; ftScore?: number }>(
       db,
@@ -208,11 +257,11 @@ async function search(repoRoot: string, q: string): Promise<Record<string, unkno
       })),
       memories: memories.sort((a, b) => Number(b.score) - Number(a.score)).slice(0, 10),
     };
-  }, { repoRoot });
+  }, repoRoot);
 }
 
 async function contextPreview(repoRoot: string, task: string, allowPaidEmbeddings: boolean): Promise<Record<string, unknown>> {
-  return await withDb(async (db, cfg) => {
+  return await withServerDb(async (db, cfg) => {
     const pack = await buildContextPack(db, cfg.repoId, task, { repoRoot, allowPaidEmbeddings });
     return {
       task: pack.task,
@@ -236,14 +285,47 @@ async function contextPreview(repoRoot: string, task: string, allowPaidEmbedding
       },
       pack,
     };
-  }, { repoRoot });
+  }, repoRoot);
 }
 
 async function handle(req: IncomingMessage, res: ServerResponse, repoRoot: string): Promise<void> {
   const url = new URL(req.url || "/", "http://127.0.0.1");
-  if (req.method !== "GET") return json(res, 405, { error: "GET only" });
 
   try {
+    if (url.pathname === "/api/operational/observe" && req.method === "POST") {
+      const body = JSON.parse((await readBody(req)) || "{}") as Record<string, unknown>;
+      const observation = await withServerDb(async (db, cfg) => recordOperationalObservation(db, {
+        scope_id: cfg.repoId,
+        problem_signature: String(body.problem_signature ?? ""),
+        symptom: String(body.symptom ?? ""),
+        scopes: Array.isArray(body.scopes) ? body.scopes.map(String) : undefined,
+        actor: String(body.actor ?? "hermes"),
+        workflow_id: body.workflow_id ? String(body.workflow_id) : undefined,
+        capability_id: body.capability_id ? String(body.capability_id) : undefined,
+        outcome: String(body.outcome ?? "") as OperationalOutcome,
+        evidence_refs: Array.isArray(body.evidence_refs) ? body.evidence_refs.map(String) : undefined,
+        solution_ref: body.solution_ref ? String(body.solution_ref) : undefined,
+        occurred_at: body.occurred_at ? String(body.occurred_at) : undefined,
+      }), repoRoot);
+      return json(res, 200, { observation });
+    }
+    if (url.pathname === "/api/operational/observations" && req.method === "GET") {
+      const observations = await withServerDb(async (db, cfg) => queryOperationalObservations(db, cfg.repoId, {
+        problemSignature: url.searchParams.get("problem") || undefined,
+        activeScopes: commaList(url.searchParams.get("scopes")),
+        limit: Number(url.searchParams.get("limit") || 50),
+      }), repoRoot);
+      return json(res, 200, { observations });
+    }
+    if (url.pathname === "/api/operational/solutions" && req.method === "GET") {
+      const solutions = await withServerDb(async (db, cfg) => queryOperationalSolutions(db, cfg.repoId, {
+        problemSignature: url.searchParams.get("problem") || undefined,
+        activeScopes: commaList(url.searchParams.get("scopes")),
+        limit: Number(url.searchParams.get("limit") || 50),
+      }), repoRoot);
+      return json(res, 200, { solutions });
+    }
+    if (req.method !== "GET") return json(res, 405, { error: "method not allowed" });
     if (url.pathname === "/api/status") return json(res, 200, await collectStatus(repoRoot));
     if (url.pathname === "/api/search") return json(res, 200, await search(repoRoot, url.searchParams.get("q") || ""));
     if (url.pathname === "/api/context") {
@@ -266,6 +348,13 @@ async function main(): Promise<void> {
   const repoRoot = repoRootFromArgs(args);
   const port = Number.parseInt(args.port || "4950", 10) || 4950;
   const server = createServer((req, res) => void handle(req, res, repoRoot));
+  const shutdown = async () => {
+    server.close();
+    await closeServerDb();
+    process.exit(0);
+  };
+  process.once("SIGTERM", () => void shutdown());
+  process.once("SIGINT", () => void shutdown());
   server.listen(port, "127.0.0.1", () => {
     console.log(`Voidarch Context setup/status page: http://127.0.0.1:${port}`);
     console.log(`Repo: ${repoRoot}`);

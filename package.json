@@ -40,7 +40,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "smoke": "bash scripts/ci-smoke.sh",
-    "test:general": "tsx --test --test-force-exit tests/general-plane.test.ts tests/context-compiler.test.ts tests/operational-observations.test.ts tests/operational-cli.test.ts"
+    "test:general": "tsx --test --test-force-exit tests/general-plane.test.ts tests/context-compiler.test.ts tests/operational-observations.test.ts tests/operational-cli.test.ts tests/operational-server.test.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",

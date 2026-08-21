@@ -92,6 +92,8 @@ The model download happens once and is cached locally. Remote embedding endpoint
 
 Run `voidarch-context help` for the complete command surface.
 
+`voidarch-context serve` exposes the same operational layer directly on loopback: `POST /api/operational/observe`, `GET /api/operational/observations`, and `GET /api/operational/solutions`. The server owns one serialized database connection for its lifetime, so embedded SurrealKV is never reopened per request.
+
 ## Storage and privacy
 
 | Path | Purpose | Commit? |
