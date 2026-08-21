@@ -34,12 +34,13 @@
     "./vectors": "./src/vectors.ts",
     "./delegation": "./src/delegation.ts",
     "./general": "./src/general.ts",
-    "./write-policy": "./src/write-policy.ts"
+    "./write-policy": "./src/write-policy.ts",
+    "./operational": "./src/operational.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "smoke": "bash scripts/ci-smoke.sh",
-    "test:general": "tsx --test --test-force-exit tests/general-plane.test.ts tests/context-compiler.test.ts"
+    "test:general": "tsx --test --test-force-exit tests/general-plane.test.ts tests/context-compiler.test.ts tests/operational-observations.test.ts tests/operational-cli.test.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",

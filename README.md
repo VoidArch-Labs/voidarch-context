@@ -14,6 +14,7 @@ Voidarch Context gives Claude Code, Codex and other coding agents persistent per
 - Tree-sitter code-graph extraction for TypeScript, TSX, JavaScript and Python, with regex fallback and file-level support for additional languages.
 - Durable memories, tasks, blockers, run records and context-pack history.
 - Scoped entities, immutable source episodes and temporal facts with provenance and review states.
+- Scoped operational problem observations and reusable verified solution references, stored as immutable episode evidence.
 - Markdown or JSON context packs with estimated token budgets.
 - A local read-mostly status, search and context page.
 - Claude Code command snippets and an `AGENTS.md` integration block.
@@ -78,6 +79,9 @@ The model download happens once and is cached locally. Remote embedding endpoint
 | `voidarch-context query "..."` | Search code-graph nodes and neighborhoods |
 | `voidarch-context context "..."` | Produce a token-budgeted Markdown or JSON context pack |
 | `voidarch-context knowledge ...` | Store/query entities, episodes and temporal facts |
+| `voidarch-context operational observe ...` | Record scoped problem/outcome evidence |
+| `voidarch-context operational search ...` | Query scoped operational observations |
+| `voidarch-context operational solutions ...` | Retrieve successful reusable solution references |
 | `voidarch-context remember --kind decision "..."` | Store a durable project memory |
 | `voidarch-context memory list` | Inspect stored memories |
 | `voidarch-context task ...` | Manage persistent task state |

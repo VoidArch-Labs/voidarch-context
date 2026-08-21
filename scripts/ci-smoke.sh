@@ -66,6 +66,8 @@ grep -q '.voidarch/db/' .gitignore
 "$BIN" search "refresh token" > "$WORK/search.txt"
 "$BIN" query "refreshAccessToken" > "$WORK/query.txt"
 "$BIN" context "fix auth token refresh" --format json --max-tokens 2000 > "$WORK/context.json"
+"$BIN" operational observe --problem smoke-static-empty --symptom "Rendered fallback worked" --scopes domain:smoke --actor smoke --outcome workaround_succeeded --evidence smoke:passed --solution-ref workflow://smoke/rendered > "$WORK/operational-observe.json"
+"$BIN" operational solutions --problem smoke-static-empty --scopes domain:smoke > "$WORK/operational-solutions.json"
 "$BIN" status > "$WORK/status.txt"
 
 node - <<'NODE' "$WORK/context.json"
@@ -85,5 +87,6 @@ grep -qi "refresh" "$WORK/search.txt"
 grep -qi "refreshAccessToken\|auth.ts" "$WORK/query.txt"
 grep -qi "decision\|rotating refresh" "$WORK/remember.txt"
 grep -qi "repo\|document\|graph\|memory" "$WORK/status.txt"
+grep -q 'workflow://smoke/rendered' "$WORK/operational-solutions.json"
 
 echo "Voidarch Context packed CLI smoke test passed."

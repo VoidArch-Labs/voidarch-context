@@ -22,6 +22,9 @@ const tsCommands = new Map([
   ["remember", "scripts/dfc-remember.ts"],
   ["memory", "scripts/dfc-memory.ts"],
   ["knowledge", "scripts/dfc-knowledge.ts"],
+  ["operational:observe", "scripts/dfc-operational.ts"],
+  ["operational:search", "scripts/dfc-operational.ts"],
+  ["operational:solutions", "scripts/dfc-operational.ts"],
   ["task", "scripts/dfc-task.ts"],
   ["blocker", "scripts/dfc-blocker.ts"],
   ["metrics", "scripts/dfc-metrics.ts"],
@@ -51,7 +54,7 @@ const tsCommands = new Map([
 // <choice>` doesn't need this: "embedding" is a fixed literal (not itself the
 // choice), so nox-config-embedding.ts reads the choice directly from its own
 // remaining argv.
-const RAW_SUBCOMMAND_SCRIPTS = new Set(["scripts/nox-models.ts"]);
+const RAW_SUBCOMMAND_SCRIPTS = new Set(["scripts/nox-models.ts", "scripts/dfc-operational.ts"]);
 
 const grouped = new Map([
   ["docs", new Set(["ingest", "query"])],
@@ -59,6 +62,7 @@ const grouped = new Map([
   ["db", new Set(["check", "status", "migrate"])],
   ["models", new Set(["status", "install"])],
   ["config", new Set(["embedding"])],
+  ["operational", new Set(["observe", "search", "solutions"])],
 ]);
 
 function help() {
@@ -91,6 +95,7 @@ Memory:
   task <add|list|update|done|get|delete>
   blocker <add|list|resolve|get|delete>
   knowledge <entity-upsert|entity-search|episode-add|episode-search|fact-assert|fact-list|fact-review>
+  operational <observe|search|solutions>    scoped problem evidence and reusable solution refs
   memory doctor
   memory gc
 
